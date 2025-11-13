@@ -1,0 +1,2315 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>도트 게임 v9 (지형/캐릭터 개선)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #243b55 0%, #141e30 100%);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        .game-container {
+            text-align: center;
+            padding: 10px;
+            width: 100%;
+            max-width: 1200px;
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        h1 {
+            color: #ecf0f1;
+            margin-bottom: 5px;
+            font-size: clamp(18px, 4vw, 28px);
+        }
+
+        .top-ui {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 0 10px;
+        }
+
+        .score-display {
+            color: #ecf0f1;
+            font-size: clamp(12px, 3vw, 16px);
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            min-width: 120px;
+        }
+
+        .score-row {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            background: rgba(52, 73, 94, 0.4);
+            padding: 2px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(236, 240, 241, 0.2);
+        }
+
+        .score-label {
+            font-size: clamp(10px, 2.4vw, 12px);
+            color: #bdc3c7;
+        }
+
+        .score-value {
+            font-size: clamp(16px, 4vw, 20px);
+            color: #f1f2f6;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 1400px;
+            max-height: 950px;
+            aspect-ratio: 1400 / 950;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border: 4px solid #34495e;
+            background: radial-gradient(circle at 50% 30%, #3cb474 0%, #1e8449 70%, #145a32 100%);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block;
+        }
+
+        .info {
+            margin-top: 10px;
+            color: #ecf0f1;
+            font-size: clamp(12px, 3vw, 16px);
+        }
+
+        .health-bar-container {
+            width: min(280px, 55vw);
+            height: 28px;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            border: 3px solid #1a252f;
+            border-radius: 6px;
+            position: relative;
+            flex: 1;
+            margin: 0 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .health-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #27ae60 0%, #2ecc71 50%, #27ae60 100%);
+            background-size: 20px 100%;
+            transition: width 0.3s ease;
+            width: 100%;
+            border-radius: 4px;
+            box-shadow: 0 0 8px rgba(46, 204, 113, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .health-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%);
+            animation: shine 2s infinite;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .health-bar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffffff;
+            font-size: clamp(11px, 2.8vw, 13px);
+            font-weight: bold;
+            z-index: 2;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8), 0 0 4px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.5px;
+        }
+
+        .weapon-display {
+            color: #f39c12;
+            font-size: clamp(12px, 3vw, 16px);
+            font-weight: bold;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .controls {
+            margin-top: 10px;
+            color: #bdc3c7;
+            font-size: clamp(10px, 2.5vw, 14px);
+        }
+
+        .character-select-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(6px);
+            background: rgba(20, 30, 48, 0.85);
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .character-select-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .character-select-panel {
+            background: rgba(26, 40, 60, 0.95);
+            border: 2px solid rgba(236, 240, 241, 0.25);
+            border-radius: 16px;
+            padding: clamp(20px, 5vw, 40px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(16px, 4vw, 24px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+            max-width: 90vw;
+        }
+
+        .character-select-title {
+            color: #ecf0f1;
+            font-size: clamp(18px, 4vw, 26px);
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .character-options {
+            display: flex;
+            gap: clamp(12px, 4vw, 24px);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .character-option {
+            width: clamp(90px, 25vw, 140px);
+            height: clamp(120px, 35vw, 180px);
+            border-radius: 16px;
+            border: 2px solid rgba(236, 240, 241, 0.2);
+            background: rgba(44, 62, 80, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #ecf0f1;
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .character-option::before {
+            content: '';
+            position: absolute;
+            inset: -40%;
+            background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .character-option:hover {
+            transform: translateY(-6px) scale(1.03);
+            border-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        .character-option:hover::before {
+            opacity: 1;
+        }
+
+        .character-option.selected {
+            border-color: #f1c40f;
+            box-shadow: 0 0 25px rgba(241, 196, 15, 0.4);
+        }
+
+        .character-name {
+            font-size: clamp(14px, 3.5vw, 18px);
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .character-description {
+            font-size: clamp(10px, 2.8vw, 12px);
+            color: #bdc3c7;
+            text-align: center;
+            padding: 0 12px;
+        }
+
+        .character-sample {
+            width: clamp(50px, 12vw, 70px);
+            height: clamp(50px, 12vw, 70px);
+            position: relative;
+            display: block;
+            border-radius: 8px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.2);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            
+        }
+        
+        .character-option[data-character="blue"] .character-sample {
+            border-radius: 4px;
+        }
+        
+        .character-option[data-character="violet"] .character-sample {
+            border-radius: 50%;
+        }
+        
+        .character-option[data-character="pink"] .character-sample {
+            border-radius: 0;
+        }
+
+        .character-select-hint {
+            font-size: clamp(10px, 2.5vw, 12px);
+            color: #95a5a6;
+        }
+
+        .game-over-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 15, 25, 0.85);
+            backdrop-filter: blur(6px);
+            z-index: 210;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .game-over-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .game-over-panel {
+            background: rgba(26, 40, 60, 0.95);
+            border: 2px solid rgba(236, 240, 241, 0.25);
+            border-radius: 18px;
+            padding: clamp(24px, 6vw, 48px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(18px, 4vw, 28px);
+            box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+            width: min(90vw, 420px);
+        }
+
+        .game-over-title {
+            color: #f8f9fa;
+            font-size: clamp(20px, 5vw, 30px);
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .game-over-score {
+            width: 100%;
+            background: rgba(52, 73, 94, 0.6);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border: 1px solid rgba(236, 240, 241, 0.15);
+            color: #ecf0f1;
+        }
+
+        .score-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(14px, 3.8vw, 18px);
+        }
+
+        .score-line span:first-child {
+            color: #bdc3c7;
+        }
+
+        .game-over-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .game-over-button {
+            background: linear-gradient(135deg, #3498db, #1abc9c);
+            border: none;
+            color: #ecf0f1;
+            padding: 12px 22px;
+            border-radius: 999px;
+            font-size: clamp(12px, 3.2vw, 16px);
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 6px 18px rgba(26, 188, 156, 0.35);
+        }
+
+        .game-over-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(26, 188, 156, 0.45);
+        }
+
+        .game-over-button.secondary {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            box-shadow: 0 6px 18px rgba(155, 89, 182, 0.35);
+        }
+
+        .game-over-button.secondary:hover {
+            box-shadow: 0 10px 22px rgba(155, 89, 182, 0.45);
+        }
+
+        /* 모바일 컨트롤 */
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            z-index: 100;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .joystick-container {
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            width: 120px;
+            height: 120px;
+        }
+
+        .joystick-base {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(52, 73, 94, 0.7);
+            border: 3px solid rgba(236, 240, 241, 0.5);
+            position: relative;
+        }
+
+        .joystick-stick {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(52, 152, 219, 0.8);
+            border: 2px solid rgba(236, 240, 241, 0.8);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s;
+        }
+
+        .attack-button {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: rgba(231, 76, 60, 0.8);
+            border: 3px solid rgba(236, 240, 241, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #ecf0f1;
+            font-weight: bold;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .attack-button:active {
+            background: rgba(192, 57, 43, 0.9);
+            transform: scale(0.95);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                align-items: flex-start;
+                padding: 0;
+            }
+
+            .game-container {
+                justify-content: flex-start;
+                padding-top: 8px;
+                padding-bottom: calc(100vh * 0.34);
+                padding-left: 10px;
+                padding-right: 10px;
+                gap: 8px;
+                width: 100%;
+                max-width: 100vw;
+            }
+
+            .top-ui {
+                padding: 0 8px;
+                width: 100%;
+                max-width: 100%;
+                gap: 8px;
+            }
+
+            .canvas-wrapper {
+                max-height: calc(100vh * 0.66);
+                width: 100%;
+                margin: 0 auto;
+            }
+
+            .health-bar-container {
+                margin: 0 4px;
+            }
+
+            .mobile-controls {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                top: calc(100vh * 0.68);
+                bottom: auto;
+                left: 50%;
+                transform: translateX(-50%);
+                width: min(90vw, 600px);
+                max-width: 90vw;
+                padding: 12px 20px;
+                gap: 20px;
+            }
+
+            .joystick-container {
+                position: relative;
+                left: auto;
+                bottom: auto;
+                flex: 0 0 auto;
+            }
+
+            .attack-button {
+                position: relative;
+                right: auto;
+                bottom: auto;
+                margin-left: auto;
+                flex: 0 0 auto;
+            }
+            
+            .controls {
+                display: none;
+            }
+
+            h1 {
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="character-select-overlay show" id="characterSelect">
+        <div class="character-select-panel">
+            <div class="character-select-title">모험을 떠날 영웅을 선택하세요!</div>
+            <div class="character-options">
+                <div class="character-option" data-character="blue">
+                    <canvas class="character-sample" data-shape="square" width="70" height="70"></canvas>
+                    <div class="character-name">기사</div>
+                    <div class="character-description">체력이 높고 속도가 빠른 캐릭터 입니다.</div>
+                </div>
+                <div class="character-option" data-character="violet">
+                    <canvas class="character-sample" data-shape="circle" width="70" height="70"></canvas>
+                    <div class="character-name">궁수</div>
+                    <div class="character-description">보통의 능력 캐릭터 입니다.</div>
+                </div>
+                <div class="character-option" data-character="pink">
+                    <canvas class="character-sample" data-shape="star" width="70" height="70"></canvas>
+                    <div class="character-name">마법사</div>
+                    <div class="character-description">체력이 낮고 속도가 느리지만 강한 캐릭터 입니다.</div>
+                </div>
+            </div>
+            <div class="character-select-hint">캐릭터를 탭하거나 클릭하면 게임이 시작됩니다.</div>
+        </div>
+    </div>
+
+    <div class="game-over-overlay" id="gameOverOverlay">
+        <div class="game-over-panel">
+            <div class="game-over-title">게임 오버</div>
+            <div class="game-over-score">
+                <div class="score-line"><span>이번 점수</span><span id="finalScore">0</span></div>
+                <div class="score-line"><span>지난 점수</span><span id="gameOverPreviousScore">0</span></div>
+            </div>
+            <div class="game-over-buttons">
+                <button class="game-over-button" id="restartButton">다시 시작</button>
+                <button class="game-over-button secondary" id="changeCharacterButton">캐릭터 선택</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <h1>🌱 도트 게임 🌱</h1>
+        <div class="top-ui">
+            <div class="score-display">
+                <div class="score-row"><span class="score-label">현재</span><span class="score-value" id="score">0</span></div>
+                <div class="score-row"><span class="score-label">지난</span><span class="score-value" id="previousScore">0</span></div>
+            </div>
+            <div class="health-bar-container">
+                <div class="health-bar" id="healthBar"></div>
+                <div class="health-bar-text">체력: <span id="health">12</span> / 12</div>
+            </div>
+            <div class="weapon-display" id="weaponDisplay">⚔ 검</div>
+        </div>
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <div class="info">
+            <div class="controls">방향키: 이동 | 스페이스바: 공격</div>
+        </div>
+    </div>
+
+    <!-- 모바일 컨트롤 -->
+    <div class="mobile-controls">
+        <div class="joystick-container">
+            <div class="joystick-base" id="joystickBase">
+                <div class="joystick-stick" id="joystickStick"></div>
+            </div>
+        </div>
+        <div class="attack-button" id="attackButton">⚔</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const tileSize = 32;
+        const ATTACK_ANIMATION_MAX = 18;
+
+        const characterSelect = document.getElementById('characterSelect');
+        const characterOptions = document.querySelectorAll('.character-option');
+        
+        function drawCharacterSample(canvas, charType, colorData) {
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+            const pixelSize = 4;
+            const offsetX = (size - 16 * pixelSize) / 2;
+            const offsetY = (size - 16 * pixelSize) / 2;
+            
+            ctx.clearRect(0, 0, size, size);
+            ctx.imageSmoothingEnabled = false;
+            
+            // 전사 (기사)
+            if (charType === 'blue') {
+                const warriorPixels = [
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000',
+                    '0000000000000000'
+                ];
+                // 간단한 전사 도트 (16x16)
+                for (let y = 0; y < 16; y++) {
+                    for (let x = 0; x < 16; x++) {
+                        let color = null;
+                        if (y >= 2 && y <= 4 && x >= 4 && x <= 11) color = colorData.bodyColor; // 머리
+                        else if (y >= 5 && y <= 8 && x >= 5 && x <= 10) color = colorData.accentColor; // 몸통
+                        else if (y >= 9 && y <= 12 && x >= 6 && x <= 9) color = colorData.bodyColor; // 다리
+                        else if (y >= 3 && y <= 4 && x >= 6 && x <= 9) color = '#000000'; // 눈
+                        if (color) {
+                            ctx.fillStyle = color;
+                            ctx.fillRect(offsetX + x * pixelSize, offsetY + y * pixelSize, pixelSize, pixelSize);
+                        }
+                    }
+                }
+            }
+            // 궁수
+            else if (charType === 'violet') {
+                for (let y = 0; y < 16; y++) {
+                    for (let x = 0; x < 16; x++) {
+                        let color = null;
+                        if (y >= 2 && y <= 4 && x >= 4 && x <= 11) color = colorData.bodyColor; // 머리
+                        else if (y >= 5 && y <= 8 && x >= 5 && x <= 10) color = colorData.accentColor; // 몸통
+                        else if (y >= 9 && y <= 12 && x >= 6 && x <= 9) color = colorData.bodyColor; // 다리
+                        else if (y >= 3 && y <= 4 && x >= 6 && x <= 9) color = '#000000'; // 눈
+                        if (color) {
+                            ctx.fillStyle = color;
+                            ctx.fillRect(offsetX + x * pixelSize, offsetY + y * pixelSize, pixelSize, pixelSize);
+                        }
+                    }
+                }
+            }
+            // 마법사
+            else if (charType === 'pink') {
+                for (let y = 0; y < 16; y++) {
+                    for (let x = 0; x < 16; x++) {
+                        let color = null;
+                        if (y >= 2 && y <= 4 && x >= 4 && x <= 11) color = colorData.bodyColor; // 머리
+                        else if (y >= 5 && y <= 8 && x >= 5 && x <= 10) color = colorData.accentColor; // 몸통
+                        else if (y >= 9 && y <= 12 && x >= 6 && x <= 9) color = colorData.bodyColor; // 다리
+                        else if (y >= 3 && y <= 4 && x >= 6 && x <= 9) color = '#000000'; // 눈
+                        if (color) {
+                            ctx.fillStyle = color;
+                            ctx.fillRect(offsetX + x * pixelSize, offsetY + y * pixelSize, pixelSize, pixelSize);
+                        }
+                    }
+                }
+            }
+        }
+        
+
+        const scoreValueEl = document.getElementById('score');
+        const previousScoreEl = document.getElementById('previousScore');
+        const healthValueEl = document.getElementById('health');
+        const healthBarEl = document.getElementById('healthBar');
+        const weaponDisplayEl = document.getElementById('weaponDisplay');
+
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const finalScoreEl = document.getElementById('finalScore');
+        const gameOverPreviousScoreEl = document.getElementById('gameOverPreviousScore');
+        const restartButton = document.getElementById('restartButton');
+        const changeCharacterButton = document.getElementById('changeCharacterButton');
+
+        const joystickBase = document.getElementById('joystickBase');
+        const joystickStick = document.getElementById('joystickStick');
+        const attackButton = document.getElementById('attackButton');
+
+        function setCharacterOptionsTabIndex(value) {
+            characterOptions.forEach(opt => opt.setAttribute('tabindex', value));
+        }
+
+        const characters = {
+            blue: {
+                bodyColor: '#4aa3ff',
+                accentColor: '#7ec8ff',
+                outlineColor: '#0b3d91',
+                detailColor: '#f5fbff',
+                auraColor: '#1f6feb',
+                shape: 'square',
+                health: 12,
+                speedMultiplier: 1.0,
+                weaponNames: ['⚔ 검', '⚔⚔ 쌍검', '🗡 대검']
+            },
+            violet: {
+                bodyColor: '#b06cff',
+                accentColor: '#d9a7ff',
+                outlineColor: '#431d77',
+                detailColor: '#f8ecff',
+                auraColor: '#8f4dff',
+                shape: 'circle',
+                health: 10,
+                speedMultiplier: 0.8,
+                weaponNames: ['🏹 화살', '🏹🏹 화살2개', '🏹🏹🏹 화살3개']
+            },
+            pink: {
+                bodyColor: '#ff69b4',
+                accentColor: '#ffb3d9',
+                outlineColor: '#8b2252',
+                detailColor: '#fff0f8',
+                auraColor: '#ff1493',
+                shape: 'star',
+                health: 8,
+                speedMultiplier: 0.65,
+                weaponNames: ['🔥 파이어애로우', '🔥🔥 파이어볼', '🔥🔥🔥 파이어로드']
+            }
+        };
+
+        characterOptions.forEach(option => {
+            const canvas = option.querySelector('.character-sample');
+            const charKey = option.getAttribute('data-character');
+            const charData = characters[charKey];
+            if (canvas && charData) {
+                drawCharacterSample(canvas, charKey, charData);
+            }
+        });
+
+
+
+        const monsterPalettes = [
+            { base: '#ff6b6b', secondary: '#c0392b', outline: '#641e16', eye: '#ffeaa7', tooth: '#f7f1e3' },
+            { base: '#ff8c42', secondary: '#ff5e57', outline: '#7f1d1d', eye: '#fff3b0', tooth: '#ffe8d6' },
+            { base: '#f53b57', secondary: '#833471', outline: '#3d0c41', eye: '#fbf1f2', tooth: '#f8edeb' }
+        ];
+
+        const yellowPalette = { base: '#f1c40f', secondary: '#f9e79f', outline: '#b9770e', eye: '#2c3e50', tooth: '#fff9db' };
+
+        let backgroundTiles = [];
+        let backgroundGrid = [];
+        let backgroundCols = 0;
+        let backgroundRows = 0;
+
+        const game = {
+            score: 0,
+            previousScore: 0,
+            health: 12,
+            maxHealth: 12,
+            keys: {},
+            touchDirection: { x: 0, y: 0 }
+        };
+
+        const weaponProfiles = {
+            blue: [
+                { range: 1, width: 16, speed: 0.4 },  // 검 (1칸)
+                { range: 2, width: 20, speed: 0.35 }, // 쌍검 (2칸)
+                { range: 3, width: 24, speed: 0.3 }   // 대검 (3칸)
+            ],
+            violet: [
+                // 궁수: 항상 화살 1발, 레벨에 따라 쿨타임/속도만 변화
+                { range: 1, width: 8, speed: 1.0, projectile: true, count: 1 },
+                { range: 1, width: 8, speed: 1.0, projectile: true, count: 1 },
+                { range: 1, width: 8, speed: 1.0, projectile: true, count: 1 }
+            ],
+            pink: [
+                // 마법사: 2칸 / 3칸 / 5칸 (Lv3는 스플래시 대미지)
+                { range: 2, width: 12, speed: 0.4, fire: true },                  // 파이어애로우 (2칸)
+                { range: 3, width: 14, speed: 0.35, fire: true },                 // 파이어볼 (3칸)
+                { range: 5, width: 18, speed: 0.3, fire: true, meteor: true }     // 파이어로드 (5칸, 스플래시)
+            ]
+        };
+
+        const baseSpeed = 3.1;
+        const player = {
+            x: 600,
+            y: 450,
+            size: 28,
+            speed: baseSpeed,
+            attackAnimation: 0,
+            attackCooldown: 0,
+            weaponLevel: 1,
+            attackDirection: { x: 1, y: 0 },
+            bodyColor: characters.blue.bodyColor,
+            accentColor: characters.blue.accentColor,
+            outlineColor: characters.blue.outlineColor,
+            detailColor: characters.blue.detailColor,
+            auraColor: characters.blue.auraColor,
+            shape: 'square',
+            characterType: 'blue',
+            invincible: false,
+            invincibleTimer: 0
+        };
+        player.color = player.bodyColor;
+
+        const monsters = [];
+        let monsterSpawnTimer = 0;
+        let monsterSpawnInterval = 90;
+        let yellowMonsterTimer = 0;
+        const yellowMonsterInterval = 500;
+        const missiles = [];
+        let missileTimer = 0;
+        const missileSpawnInterval = 600;
+        const arrows = [];  // 궁수 화살 배열
+
+        let gameStarted = false;
+        let maxMonstersAllowed = 5;
+        const maxMonstersCap = 20;
+        let difficultyTimer = 0;
+        const difficultyIncreaseInterval = 600;
+        let gameOverPending = false;
+
+        function resizeCanvas() {
+            const maxWidth = Math.min(1400, window.innerWidth - 40);
+            const maxHeight = Math.min(950, window.innerHeight - 160);
+            
+            const aspectRatio = 1200 / 900;
+            let width = maxWidth;
+            let height = width / aspectRatio;
+            
+            if (height > maxHeight) {
+                height = maxHeight;
+                width = height * aspectRatio;
+            }
+            
+            canvas.width = 1200;
+            canvas.height = 900;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function applyCharacterStyle(key) {
+            const style = characters[key] || characters.blue;
+            player.bodyColor = style.bodyColor;
+            player.accentColor = style.accentColor;
+            player.outlineColor = style.outlineColor;
+            player.detailColor = style.detailColor;
+            player.auraColor = style.auraColor;
+            player.color = style.bodyColor;
+            player.shape = style.shape;
+            player.speed = baseSpeed * style.speedMultiplier;
+            player.characterType = key;
+            game.maxHealth = style.health;
+            game.health = style.health;
+            updateHealth();
+        }
+
+        function handleCharacterSelect(option) {
+            const key = option.dataset.character;
+            characterOptions.forEach(opt => opt.classList.remove('selected'));
+            option.classList.add('selected');
+            applyCharacterStyle(key);
+            characterSelect.classList.remove('show');
+            characterSelect.setAttribute('aria-hidden', 'true');
+            if (!gameStarted) {
+                gameStarted = true;
+            }
+            resetGame();
+            setCharacterOptionsTabIndex('-1');
+            if (document.activeElement === option) {
+                option.blur();
+            }
+        }
+
+        characterOptions.forEach(option => {
+            option.setAttribute('tabindex', '0');
+            option.addEventListener('click', () => handleCharacterSelect(option));
+            option.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleCharacterSelect(option);
+                }
+            });
+        });
+
+        function initBackground() {
+            backgroundTiles = [];
+            backgroundGrid = [];
+            backgroundCols = Math.ceil(1200 / tileSize);
+            backgroundRows = Math.ceil(900 / tileSize);
+
+            for (let row = 0; row < backgroundRows; row++) {
+                const rowTiles = [];
+                for (let col = 0; col < backgroundCols; col++) {
+                    // 가장자리 2칸에는 장애물 생성 안 함
+                    const isEdge = row < 2 || row >= backgroundRows - 2 || col < 2 || col >= backgroundCols - 2;
+                    
+                    const random = Math.random();
+                    let overlay = null;
+                    let obstacle = false;
+
+                    if (!isEdge) {
+                        // 지형물 밀도 1.5배 (조금 더 빽빽하게)
+                        if (random < 0.03) {
+                            overlay = 'tree';
+                            obstacle = true;
+                        } else if (random < 0.054) {
+                            overlay = 'rock';
+                            obstacle = true;
+                        }
+                    }
+
+                    const tile = {
+                        x: col * tileSize,
+                        y: row * tileSize,
+                        lightness: 28 + Math.floor(Math.random() * 10),
+                        textureVariant: Math.random(),
+                        overlay,
+                        obstacle,
+                        variant: Math.random()
+                    };
+
+                    backgroundTiles.push(tile);
+                    rowTiles.push(tile);
+                }
+                backgroundGrid.push(rowTiles);
+            }
+        }
+
+        function drawOverlay(tile) {
+            const centerX = tile.x + tileSize / 2;
+            const centerY = tile.y + tileSize / 2;
+            ctx.save();
+            ctx.translate(centerX, centerY);
+
+            switch (tile.overlay) {
+                case 'tree': {
+                    ctx.fillStyle = '#6b3f1f';
+                    ctx.fillRect(-4, 6, 8, 12);
+                    const gradient = ctx.createRadialGradient(0, -6, 4, 0, -6, 16);
+                    gradient.addColorStop(0, '#41d77a');
+                    gradient.addColorStop(1, '#1f8f4f');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -6, 12, 14, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    break;
+                }
+                case 'rock': {
+                    ctx.fillStyle = '#d0d6d8';
+                    ctx.beginPath();
+                    ctx.moveTo(-10, 8);
+                    ctx.lineTo(0, -10);
+                    ctx.lineTo(12, 6);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(66, 73, 80, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+                    ctx.beginPath();
+                    ctx.moveTo(-2, -2);
+                    ctx.lineTo(4, -6);
+                    ctx.lineTo(6, 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawBackground() {
+            backgroundTiles.forEach(tile => {
+                ctx.fillStyle = `hsl(140, 45%, ${tile.lightness}%)`;
+                ctx.fillRect(tile.x, tile.y, tileSize, tileSize);
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.035 + tile.textureVariant * 0.025})`;
+                ctx.fillRect(tile.x + (tile.textureVariant * tileSize) % tileSize, tile.y + (tile.textureVariant * 7) % tileSize, 1.2, 1.2);
+
+                ctx.fillStyle = `rgba(0, 0, 0, ${0.04 * tile.textureVariant})`;
+                ctx.fillRect(tile.x + ((1 - tile.textureVariant) * tileSize) % tileSize, tile.y + ((tile.textureVariant * 5) % tileSize), 1, 1);
+            });
+
+            backgroundTiles.forEach(tile => {
+                if (tile.overlay) {
+                    drawOverlay(tile);
+                }
+            });
+        }
+
+        function checkCollision(x, y, size) {
+            const half = size / 2;
+            const left = x - half;
+            const right = x + half;
+            const top = y - half;
+            const bottom = y + half;
+
+            const startCol = Math.floor(left / tileSize);
+            const endCol = Math.floor(right / tileSize);
+            const startRow = Math.floor(top / tileSize);
+            const endRow = Math.floor(bottom / tileSize);
+            
+            for (let row = startRow; row <= endRow; row++) {
+                for (let col = startCol; col <= endCol; col++) {
+                    if (row < 0 || col < 0 || row >= backgroundRows || col >= backgroundCols) continue;
+                    const tile = backgroundGrid[row][col];
+                    if (tile && tile.obstacle) {
+                        const tileLeft = tile.x;
+                        const tileRight = tile.x + tileSize;
+                        const tileTop = tile.y;
+                        const tileBottom = tile.y + tileSize;
+                        if (right > tileLeft && left < tileRight && bottom > tileTop && top < tileBottom) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function drawWeaponEffect() {
+            const angle = Math.atan2(player.attackDirection.y || 0, player.attackDirection.x || 1);
+            const charType = player.characterType;
+            const profiles = weaponProfiles[charType];
+            const profile = profiles[player.weaponLevel - 1];
+            const animProgress = player.attackAnimation / ATTACK_ANIMATION_MAX;
+            const speedModifier = profile.speed || 0.5;
+            const effectiveProgress = Math.min(1.0, animProgress * speedModifier);
+
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(angle);
+
+            if (charType === 'blue') {
+                // 전사: 검/쌍검/대검
+                const range = profile.range * tileSize;
+                const swingAngle = (1 - effectiveProgress) * Math.PI * 0.9 - Math.PI * 0.45;
+                const swordLength = range * (0.7 + 0.3 * effectiveProgress);
+                
+                if (player.weaponLevel === 2) {
+                    // 쌍검: 두 개의 검
+                    for (let i = 0; i < 2; i++) {
+                        const offset = (i - 0.5) * 0.1;
+                        const swordAngle = swingAngle + offset;
+                        const tipX = Math.cos(swordAngle) * swordLength;
+                        const tipY = Math.sin(swordAngle) * swordLength;
+                        
+                        ctx.strokeStyle = 'rgba(74, 163, 255, 1.0)';
+                        ctx.lineWidth = 6;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(tipX, tipY);
+                        ctx.stroke();
+                    }
+                } else if (player.weaponLevel === 3) {
+                    // 대검: 큰 검
+                    const tipX = Math.cos(swingAngle) * swordLength;
+                    const tipY = Math.sin(swingAngle) * swordLength;
+                    
+                    ctx.strokeStyle = 'rgba(74, 163, 255, 1.0)';
+                    ctx.lineWidth = 10;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(tipX, tipY);
+                    ctx.stroke();
+                } else {
+                    // 검: 기본 검
+                    const tipX = Math.cos(swingAngle) * swordLength;
+                    const tipY = Math.sin(swingAngle) * swordLength;
+                    
+                    ctx.strokeStyle = 'rgba(74, 163, 255, 1.0)';
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(tipX, tipY);
+                    ctx.stroke();
+                }
+            } else if (charType === 'violet') {
+                // 궁수는 화살 발사로 처리 (drawWeaponEffect에서는 아무것도 안 함)
+            } else if (charType === 'pink') {
+                // 마법사: 파이어 효과
+                const range = profile.range * tileSize;
+                const fireDist = range * effectiveProgress;
+                
+                if (player.weaponLevel === 1) {
+                    // 파이어애로우: 작은 불 (3칸)
+                    for (let i = 0; i < 3; i++) {
+                        const dist = (i + 1) * (fireDist / 3);
+                        const fireX = dist;
+                        const fireY = 0;
+                        const fireSize = 8;
+                        
+                        const gradient = ctx.createRadialGradient(fireX, fireY, 0, fireX, fireY, fireSize);
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                        gradient.addColorStop(0.3, 'rgba(255, 200, 0, 1.0)');
+                        gradient.addColorStop(1, 'rgba(255, 100, 0, 0.7)');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(fireX, fireY, fireSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else if (player.weaponLevel === 2) {
+                    // 파이어볼: 큰 불 (4칸)
+                    for (let i = 0; i < 4; i++) {
+                        const dist = (i + 1) * (fireDist / 4);
+                        const fireX = dist;
+                        const fireY = 0;
+                        const fireSize = 12;
+                        
+                        const gradient = ctx.createRadialGradient(fireX, fireY, 0, fireX, fireY, fireSize);
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                        gradient.addColorStop(0.2, 'rgba(255, 200, 0, 1.0)');
+                        gradient.addColorStop(0.5, 'rgba(255, 140, 0, 0.95)');
+                        gradient.addColorStop(1, 'rgba(255, 69, 0, 0.7)');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(fireX, fireY, fireSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    // 파이어로드: 메테오 (5칸)
+                    for (let i = 0; i < 5; i++) {
+                        const dist = (i + 1) * (fireDist / 5);
+                        const fireX = dist;
+                        const fireY = 0;
+                        const fireSize = 16;
+                        
+                        const gradient = ctx.createRadialGradient(fireX, fireY, 0, fireX, fireY, fireSize);
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                        gradient.addColorStop(0.2, 'rgba(255, 215, 0, 1.0)');
+                        gradient.addColorStop(0.5, 'rgba(255, 140, 0, 0.95)');
+                        gradient.addColorStop(1, 'rgba(255, 69, 0, 0.7)');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(fireX, fireY, fireSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            ctx.restore();
+        }
+
+        
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            // 무적 상태일 때 반투명 효과
+            if (player.invincible) {
+                const alpha = 0.3 + Math.sin(Date.now() / 50) * 0.2;
+                ctx.globalAlpha = Math.max(0.3, Math.min(0.7, alpha));
+            }
+
+            ctx.imageSmoothingEnabled = false;
+            const pixelSize = 2;
+            const charSize = 16;
+            const offsetX = -charSize * pixelSize / 2;
+            const offsetY = -charSize * pixelSize / 2;
+
+            // 그림자
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(offsetX + 4 * pixelSize, offsetY + 14 * pixelSize, 8 * pixelSize, 2 * pixelSize);
+
+            // 도트 스타일 캐릭터 그리기
+            for (let y = 0; y < 16; y++) {
+                for (let x = 0; x < 16; x++) {
+                    let color = null;
+
+                    if (player.characterType === 'blue') {
+                        // 전사: 투구 + 갑옷
+                        if (y >= 1 && y <= 4 && x >= 4 && x <= 11) color = player.bodyColor; // 머리/투구
+                        else if (y >= 5 && y <= 8 && x >= 5 && x <= 10) color = player.accentColor; // 갑옷
+                        else if (y >= 9 && y <= 12 && x >= 6 && x <= 9) color = player.bodyColor; // 다리
+                    } else if (player.characterType === 'violet') {
+                        // 궁수: 후드 + 망토
+                        if (y >= 1 && y <= 4 && x >= 4 && x <= 11) color = player.bodyColor; // 머리/후드
+                        else if (y >= 5 && y <= 8 && x >= 5 && x <= 10) color = player.accentColor; // 상체
+                        else if (y >= 9 && y <= 12 && x >= 6 && x <= 9) color = player.bodyColor; // 다리
+                    } else if (player.characterType === 'pink') {
+                        // 마법사: 모자 + 로브
+                        if (y >= 0 && y <= 3 && x >= 5 && x <= 10) color = player.accentColor; // 모자
+                        else if (y >= 4 && y <= 12 && x >= 5 && x <= 10) color = player.bodyColor; // 로브
+                    }
+
+                    // 눈 공통
+                    if (y >= 3 && y <= 4 && x >= 6 && x <= 9) {
+                        color = '#000000';
+                    }
+
+                    if (color) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(offsetX + x * pixelSize, offsetY + y * pixelSize, pixelSize, pixelSize);
+                    }
+                }
+            }
+
+            // 무적 상태일 때 globalAlpha 복원
+            if (player.invincible) {
+                ctx.globalAlpha = 1.0;
+            }
+
+            ctx.restore();
+        }
+
+
+					function spawnMonster(isYellow = false) {
+ 						 if (monsters.length >= maxMonstersAllowed) return;
+
+					  const trySpawn = () => {
+					    const side = Math.floor(Math.random() * 4);
+					    let x, y;
+					    switch (side) {
+					      case 0: x = Math.random() * canvas.width; y = -30; break;
+					      case 1: x = canvas.width + 30; y = Math.random() * canvas.height; break;
+					      case 2: x = Math.random() * canvas.width; y = canvas.height + 30; break;
+					      default: x = -30; y = Math.random() * canvas.height; break;
+					    }
+					    return { x, y };
+					  };
+					
+					  // 🔸 최대 20번까지 안전 좌표 탐색
+					  let pos = trySpawn();
+					  let tries = 0;
+					  while (tries < 20 && checkCollision(pos.x, pos.y, isYellow ? 26 : 24)) { // ← 현재 checkCollision 재사용
+					    pos = trySpawn();
+					    tries++;
+					  }
+					
+					  const palette = isYellow ? yellowPalette : monsterPalettes[Math.floor(Math.random() * monsterPalettes.length)];
+					  const size = isYellow ? 26 : 24;
+					  const speed = isYellow ? 1.4 + Math.random() * 1.1 : 1.6 + Math.random() * 1.4;
+					
+					  monsters.push({
+					    x: pos.x,
+					    y: pos.y,
+					    size,
+					    speed,
+					    palette,
+					    attackAnimation: 0,
+					    lastDamageTime: 0,
+					    isYellow,
+					    wobbleSeed: Math.random(),
+					    variant: Math.floor(Math.random() * 3),
+					    // ⬇️ 얼묶임 감지용
+					    _lastX: pos.x, _lastY: pos.y, _stuckFrames: 0
+					  });
+					}
+
+
+        function drawMonsters() {
+            const now = Date.now();
+            monsters.forEach(monster => {
+                    const dx = player.x - monster.x;
+                    const dy = player.y - monster.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+                ctx.save();
+                ctx.translate(monster.x, monster.y);
+
+                if (monster.attackAnimation > 0) {
+                    const reach = 18 + monster.attackAnimation * 1.5;
+                    ctx.fillStyle = 'rgba(192, 57, 43, 0.35)';
+                    ctx.beginPath();
+                    ctx.arc((dx / dist) * reach, (dy / dist) * reach, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                const pulse = Math.sin(now / 200 + monster.wobbleSeed * Math.PI) * 0.08 + 1;
+                const radius = (monster.size / 2) * pulse;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                ctx.beginPath();
+                ctx.ellipse(0, radius + 6, radius * 1.3, radius / 2.3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                const gradient = ctx.createRadialGradient(-radius / 3, -radius / 3, radius / 4, 0, 0, radius);
+                gradient.addColorStop(0, monster.palette.secondary);
+                gradient.addColorStop(1, monster.palette.base);
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = monster.palette.outline;
+                ctx.stroke();
+
+                ctx.fillStyle = monster.palette.outline;
+                if (!monster.isYellow) {
+                    if (monster.variant === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(-radius + 4, -radius + 2);
+                        ctx.lineTo(-radius - 6, -radius - 10);
+                        ctx.lineTo(-radius + 6, -radius + 4);
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.moveTo(radius - 4, -radius + 2);
+                        ctx.lineTo(radius + 6, -radius - 10);
+                        ctx.lineTo(radius - 6, -radius + 4);
+                        ctx.fill();
+                    } else if (monster.variant === 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, -radius - 8);
+                        ctx.lineTo(-6, -radius + 4);
+                        ctx.lineTo(6, -radius + 4);
+                        ctx.fill();
+                    } else {
+                        ctx.beginPath();
+                        ctx.moveTo(-radius + 2, radius - 4);
+                        ctx.lineTo(-radius - 6, radius + 6);
+                        ctx.lineTo(-radius + 6, radius - 2);
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.moveTo(radius - 2, radius - 4);
+                        ctx.lineTo(radius + 6, radius + 6);
+                        ctx.lineTo(radius - 6, radius - 2);
+                        ctx.fill();
+                    }
+                }
+
+                ctx.fillStyle = monster.palette.eye;
+                if (monster.variant === 1 && !monster.isYellow) {
+                    ctx.beginPath();
+                    ctx.arc(0, -radius / 6, radius / 4 + 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = monster.isYellow ? '#2c3e50' : '#111';
+                    ctx.beginPath();
+                    ctx.arc(0, -radius / 6, radius / 7, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(-radius / 3, -radius / 5, radius / 5, 0, Math.PI * 2);
+                    ctx.arc(radius / 3, -radius / 5, radius / 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = monster.isYellow ? '#2c3e50' : '#111';
+                    ctx.beginPath();
+                    ctx.arc(-radius / 3, -radius / 5, radius / 7, 0, Math.PI * 2);
+                    ctx.arc(radius / 3, -radius / 5, radius / 7, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.strokeStyle = monster.palette.outline;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, radius / 3, radius / 2.2, 0, Math.PI);
+                ctx.stroke();
+
+                ctx.fillStyle = monster.palette.tooth;
+                for (let i = -2; i <= 2; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(i * 4, radius / 3);
+                    ctx.lineTo(i * 4 + 2, radius / 2.2);
+                    ctx.lineTo(i * 4 + 4, radius / 3);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                if (monster.isYellow) {
+                    const aura = Math.sin(now / 250 + monster.wobbleSeed) * 0.2 + 1.2;
+                    ctx.strokeStyle = `rgba(241, 196, 15, ${0.4 * aura})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius + 6, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            });
+        }
+
+        function spawnMissile() {
+            const size = 24;
+            const speed = 4 + Math.random() * 1.8;
+            const side = Math.floor(Math.random() * 4);
+            let x;
+            let y;
+
+            switch (side) {
+                case 0:
+                    x = Math.random() * canvas.width;
+                    y = -40;
+                    break;
+                case 1:
+                    x = canvas.width + 40;
+                    y = Math.random() * canvas.height;
+                    break;
+                case 2:
+                    x = Math.random() * canvas.width;
+                    y = canvas.height + 40;
+                    break;
+                default:
+                    x = -40;
+                    y = Math.random() * canvas.height;
+                    break;
+            }
+
+            const targetX = Math.random() * canvas.width;
+            const targetY = Math.random() * canvas.height;
+            const dx = targetX - x;
+            const dy = targetY - y;
+            const dist = Math.hypot(dx, dy) || 1;
+
+            const vx = (dx / dist) * speed;
+            const vy = (dy / dist) * speed;
+
+            missiles.push({
+                x,
+                y,
+                vx,
+                vy,
+                size,
+                damage: 2,
+                rotation: Math.atan2(vy, vx)
+            });
+        }
+
+        function updateMissiles() {
+            for (let i = missiles.length - 1; i >= 0; i--) {
+                const missile = missiles[i];
+                missile.x += missile.vx;
+                missile.y += missile.vy;
+                missile.rotation = Math.atan2(missile.vy, missile.vx);
+
+                if (missile.x < -80 || missile.x > canvas.width + 80 || missile.y < -80 || missile.y > canvas.height + 80) {
+                    missiles.splice(i, 1);
+                    continue;
+                }
+
+                if (!gameOverPending && !player.invincible) {
+                    const distance = Math.hypot(player.x - missile.x, player.y - missile.y);
+                    if (distance < missile.size / 2 + player.size / 2 - 2) {
+                        missiles.splice(i, 1);
+                        game.health = Math.max(0, game.health - missile.damage);
+                        // 무적 상태 부여 (1초 = 60프레임)
+                        player.invincible = true;
+                        player.invincibleTimer = 60;
+                        updateHealth();
+                        continue;
+                    }
+                }
+            }
+        }
+
+        function updateArrows() {
+            for (let i = arrows.length - 1; i >= 0; i--) {
+                const arrow = arrows[i];
+                arrow.x += arrow.vx;
+                arrow.y += arrow.vy;
+                
+                // 맵 밖으로 나가거나 장애물에 닿으면 제거
+                if (arrow.x < 0 || arrow.x > canvas.width || arrow.y < 0 || arrow.y > canvas.height || 
+                    checkCollision(arrow.x, arrow.y, 8)) {
+                    arrows.splice(i, 1);
+                    continue;
+                }
+                
+                // 몬스터와 충돌 체크
+                for (let j = monsters.length - 1; j >= 0; j--) {
+                    const monster = monsters[j];
+                    const dist = Math.hypot(arrow.x - monster.x, arrow.y - monster.y);
+                    if (dist < arrow.size / 2 + monster.size / 2) {
+                        arrows.splice(i, 1);
+                        if (monster.isYellow) {
+                            upgradeWeapon();
+                        }
+                        monsters.splice(j, 1);
+                        game.score += 1;
+                        updateScore();
+                        break;
+                    }
+                }
+            }
+        }
+        
+        function drawArrows() {
+            arrows.forEach(arrow => {
+                ctx.save();
+                ctx.translate(arrow.x, arrow.y);
+                ctx.rotate(arrow.rotation);
+                
+                // 화살 그리기
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(-12, -2, 12, 4);
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-8, -4);
+                ctx.lineTo(-8, 4);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+
+        function drawMissiles() {
+            missiles.forEach(missile => {
+                ctx.save();
+                ctx.translate(missile.x, missile.y);
+                ctx.rotate(missile.rotation);
+
+                const flameGradient = ctx.createLinearGradient(-missile.size, 0, 0, 0);
+                flameGradient.addColorStop(0, 'rgba(255, 149, 0, 0)');
+                flameGradient.addColorStop(1, 'rgba(255, 94, 0, 0.8)');
+                ctx.fillStyle = flameGradient;
+                ctx.beginPath();
+                ctx.moveTo(-missile.size, 0);
+                ctx.lineTo(-missile.size / 3, missile.size / 3);
+                ctx.lineTo(-missile.size / 3, -missile.size / 3);
+                ctx.closePath();
+                ctx.fill();
+
+                const bodyGradient = ctx.createLinearGradient(-missile.size / 2, 0, missile.size / 2, 0);
+                bodyGradient.addColorStop(0, '#ff6b6b');
+                bodyGradient.addColorStop(1, '#ff4757');
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, missile.size / 2, missile.size / 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                ctx.beginPath();
+                ctx.arc(missile.size / 2 - 4, 0, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        function findPathAroundObstacle(monster, targetX, targetY) {
+            const dx = targetX - monster.x;
+            const dy = targetY - monster.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 1) return { x: monster.x, y: monster.y };
+            
+            const dirX = dx / dist;
+            const dirY = dy / dist;
+            const step = monster.speed;
+            const newX = monster.x + dirX * step;
+            const newY = monster.y + dirY * step;
+            
+            if (!checkCollision(newX, newY, monster.size)) {
+                return { x: newX, y: newY };
+            }
+            
+            const perpAngles = [Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4];
+            for (const angle of perpAngles) {
+                const perpX = Math.cos(angle);
+                const perpY = Math.sin(angle);
+                const testX = monster.x + (dirX * 0.5 + perpX * 0.5) * step;
+                const testY = monster.y + (dirY * 0.5 + perpY * 0.5) * step;
+                if (!checkCollision(testX, testY, monster.size)) {
+                    return { x: testX, y: testY };
+                }
+            }
+            
+            if (!checkCollision(newX, monster.y, monster.size)) {
+                return { x: newX, y: monster.y };
+            }
+            if (!checkCollision(monster.x, newY, monster.size)) {
+                return { x: monster.x, y: newY };
+            }
+            
+            return { x: monster.x, y: monster.y };
+        }
+
+        function updateMonsters() {
+            const currentTime = Date.now();
+            
+            for (let i = monsters.length - 1; i >= 0; i--) {
+                const monster = monsters[i];
+                
+                if (monster.attackAnimation > 0) {
+                    monster.attackAnimation--;
+                }
+                
+                const dx = player.x - monster.x;
+                const dy = player.y - monster.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 1) {
+                    const hasDirectLine = hasLineOfSight(monster.x, monster.y, player.x, player.y);
+                    
+                    if (hasDirectLine) {
+                        const newPos = findPathAroundObstacle(monster, player.x, player.y);
+                        monster.x = Math.max(monster.size / 2, Math.min(canvas.width - monster.size / 2, newPos.x));
+                        monster.y = Math.max(monster.size / 2, Math.min(canvas.height - monster.size / 2, newPos.y));
+                    } else {
+                        // 장애물 뒤에 있어도 플레이어 방향으로 이동 시도
+                        const searchRadius = Math.min(canvas.width, canvas.height) * 0.3;
+                        const searchSteps = 12;
+                        let bestAngle = Math.atan2(dy, dx);
+                        let bestDist = distance;
+                        let foundPath = false;
+                        
+                        // 플레이어 방향으로 직접 이동 시도
+                        const directX = monster.x + Math.cos(bestAngle) * monster.speed;
+                        const directY = monster.y + Math.sin(bestAngle) * monster.speed;
+                        if (!checkCollision(directX, directY, monster.size)) {
+                            monster.x = Math.max(monster.size / 2, Math.min(canvas.width - monster.size / 2, directX));
+                            monster.y = Math.max(monster.size / 2, Math.min(canvas.height - monster.size / 2, directY));
+                            foundPath = true;
+                        }
+                        
+                        // 직접 이동이 안 되면 주변 탐색
+                        if (!foundPath) {
+                            for (let s = 0; s < searchSteps; s++) {
+                                const testAngle = bestAngle + (s - searchSteps / 2) * (Math.PI * 2 / searchSteps);
+                                const testX = monster.x + Math.cos(testAngle) * monster.speed;
+                                const testY = monster.y + Math.sin(testAngle) * monster.speed;
+                                const testDist = Math.hypot(player.x - testX, player.y - testY);
+                                
+                                if (testDist < bestDist && !checkCollision(testX, testY, monster.size)) {
+                                    bestAngle = testAngle;
+                                    bestDist = testDist;
+                                    foundPath = true;
+                                }
+                            }
+                            
+                            if (foundPath) {
+                                const moveX = Math.cos(bestAngle) * monster.speed;
+                                const moveY = Math.sin(bestAngle) * monster.speed;
+                                const newX = monster.x + moveX;
+                                const newY = monster.y + moveY;
+                                
+                                if (!checkCollision(newX, newY, monster.size)) {
+                                    monster.x = Math.max(monster.size / 2, Math.min(canvas.width - monster.size / 2, newX));
+                                    monster.y = Math.max(monster.size / 2, Math.min(canvas.height - monster.size / 2, newY));
+                                } else if (!checkCollision(newX, monster.y, monster.size)) {
+                                    monster.x = Math.max(monster.size / 2, Math.min(canvas.width - monster.size / 2, newX));
+                                } else if (!checkCollision(monster.x, newY, monster.size)) {
+                                    monster.y = Math.max(monster.size / 2, Math.min(canvas.height - monster.size / 2, newY));
+                                }
+                            } else {
+                                // 완전히 막혀있어도 플레이어 방향으로 최대한 이동 시도
+                                const newPos = findPathAroundObstacle(monster, player.x, player.y);
+                                monster.x = Math.max(monster.size / 2, Math.min(canvas.width - monster.size / 2, newPos.x));
+                                monster.y = Math.max(monster.size / 2, Math.min(canvas.height - monster.size / 2, newPos.y));
+                            }
+                        }
+                    }
+                }
+
+                const distToPlayer = Math.hypot(player.x - monster.x, player.y - monster.y);
+                const attackRange = (player.size / 2) + (monster.size / 2) - 2;
+                
+                if (distToPlayer < attackRange) {
+                    const safeDistance = Math.max(attackRange, 1);
+                    const nx = distToPlayer > 0 ? (player.x - monster.x) / distToPlayer : 0;
+                    const ny = distToPlayer > 0 ? (player.y - monster.y) / distToPlayer : 0;
+                    const overlap = safeDistance - distToPlayer + 1.2;
+
+                    if (overlap > 0) {
+                        const pushDistance = tileSize * 1.0;
+                        const monsterPush = pushDistance * 1.2;
+                        const playerPush = pushDistance * 0.4;
+
+                        const monsterTargetX = monster.x - nx * monsterPush;
+                        const monsterTargetY = monster.y - ny * monsterPush;
+                        if (!checkCollision(monsterTargetX, monster.y, monster.size)) {
+                            monster.x = Math.max(monster.size / 2, Math.min(canvas.width - monster.size / 2, monsterTargetX));
+                        }
+                        if (!checkCollision(monster.x, monsterTargetY, monster.size)) {
+                            monster.y = Math.max(monster.size / 2, Math.min(canvas.height - monster.size / 2, monsterTargetY));
+                        }
+
+                        const playerTargetX = player.x + nx * playerPush;
+                        const playerTargetY = player.y + ny * playerPush;
+
+                        if (!checkCollision(playerTargetX, player.y, player.size)) {
+                            player.x = Math.max(player.size / 2, Math.min(canvas.width - player.size / 2, playerTargetX));
+                        }
+                        if (!checkCollision(player.x, playerTargetY, player.size)) {
+                            player.y = Math.max(player.size / 2, Math.min(canvas.height - player.size / 2, playerTargetY));
+                        }
+                    }
+
+                    if (currentTime - monster.lastDamageTime > 1000 && !gameOverPending && !player.invincible) {
+                        monster.lastDamageTime = currentTime;
+                        monster.attackAnimation = 10;
+                        game.health -= 1;
+                        if (player.weaponLevel > 1) {
+                            player.weaponLevel -= 1;
+                            updateWeaponDisplay();
+                        }
+                        // 무적 상태 부여 (1초 = 60프레임)
+                        player.invincible = true;
+                        player.invincibleTimer = 60;
+                        updateHealth();
+                    }
+                }
+            }
+        }
+
+        function hasLineOfSight(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const distance = Math.hypot(dx, dy);
+            const steps = Math.max(1, Math.ceil(distance / 8));
+            for (let i = 1; i < steps; i++) {
+                const t = i / steps;
+                const sx = x1 + dx * t;
+                const sy = y1 + dy * t;
+                if (checkCollision(sx, sy, 6)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function isMonsterHitByAttack(monster) {
+            const charType = player.characterType;
+            const profiles = weaponProfiles[charType];
+            const profile = profiles[player.weaponLevel - 1];
+            const dirX = player.attackDirection.x;
+            const dirY = player.attackDirection.y;
+            const relX = monster.x - player.x;
+            const relY = monster.y - player.y;
+            const dist = Math.hypot(relX, relY);
+            const forwardDist = relX * dirX + relY * dirY;
+            
+            // 궁수는 화살로 처리하므로 여기서는 false
+            if (profile.projectile) {
+                return false;
+            }
+            
+            // 전사: 검 범위 체크
+            if (charType === 'blue') {
+                const range = profile.range * tileSize;
+                if (dist > range) return false;
+                
+                const swingAngle = Math.atan2(dirY, dirX);
+                const monsterAngle = Math.atan2(relY, relX);
+                let angleDiff = Math.abs(monsterAngle - swingAngle);
+                if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+                
+                if (angleDiff > Math.PI * 0.6) return false;
+            }
+            // 마법사: 실제 불구체 위치 기준으로 범위 체크
+            else if (charType === 'pink') {
+                const range = profile.range * tileSize;
+                const angle = Math.atan2(dirY, dirX);
+                
+                const count = player.weaponLevel === 1 ? 3
+                              : player.weaponLevel === 2 ? 4
+                              : 5;
+                
+                let hitByFire = false;
+                for (let i = 0; i < count; i++) {
+                    const t = (i + 1) / (count + 1);
+                    const fireDist = range * t;
+                    
+                    const cx = player.x + Math.cos(angle) * fireDist;
+                    const cy = player.y + Math.sin(angle) * fireDist;
+                    
+                    let baseRadius = player.weaponLevel === 1 ? 18
+                                    : player.weaponLevel === 2 ? 22
+                                    : 26;
+                    
+                    if (profile.meteor) {
+                        baseRadius *= 1.3;
+                    }
+                    
+                    const dx = monster.x - cx;
+                    const dy = monster.y - cy;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 <= baseRadius * baseRadius) {
+                        hitByFire = true;
+                        break;
+                    }
+                }
+                
+                if (!hitByFire) return false;
+            }
+            
+            if (!hasLineOfSight(player.x, player.y, monster.x, monster.y)) {
+                return false;
+            }
+            
+            return true;
+        }
+
+        function upgradeWeapon() {
+            if (player.weaponLevel < 3) {
+                player.weaponLevel++;
+                updateWeaponDisplay();
+            }
+        }
+
+        function updateWeaponDisplay() {
+            const charStyle = characters[player.characterType] || characters.blue;
+            weaponDisplayEl.textContent = charStyle.weaponNames[player.weaponLevel - 1];
+        }
+
+        function updateScore() {
+            scoreValueEl.textContent = game.score;
+        }
+
+        function updatePreviousScore() {
+            previousScoreEl.textContent = game.previousScore;
+        }
+
+        function refreshHealthUI() {
+            const percent = Math.max(0, Math.min(100, (game.health / game.maxHealth) * 100));
+            healthBarEl.style.width = percent + '%';
+            healthValueEl.textContent = Math.max(0, Math.floor(game.health));
+
+            if (percent > 60) {
+                healthBarEl.style.background = 'linear-gradient(90deg, #27ae60 0%, #2ecc71 50%, #27ae60 100%)';
+                healthBarEl.style.boxShadow = '0 0 8px rgba(46, 204, 113, 0.4)';
+            } else if (percent > 30) {
+                healthBarEl.style.background = 'linear-gradient(90deg, #f39c12 0%, #f1c40f 50%, #f39c12 100%)';
+                healthBarEl.style.boxShadow = '0 0 8px rgba(241, 196, 15, 0.4)';
+            } else {
+                healthBarEl.style.background = 'linear-gradient(90deg, #e74c3c 0%, #c0392b 50%, #e74c3c 100%)';
+                healthBarEl.style.boxShadow = '0 0 8px rgba(231, 76, 60, 0.4)';
+            }
+            healthBarEl.style.backgroundSize = '20px 100%';
+        }
+
+        function updateHealth() {
+            refreshHealthUI();
+            if (game.health <= 0 && !gameOverPending) {
+                handleGameOver();
+            }
+        }
+
+        function handleGameOver() {
+            gameOverPending = true;
+            gameStarted = false;
+            game.previousScore = game.score;
+            updatePreviousScore();
+            finalScoreEl.textContent = game.score;
+            gameOverPreviousScoreEl.textContent = game.previousScore;
+            gameOverOverlay.classList.add('show');
+        }
+
+        function findSafeSpawnPosition() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const searchRadius = Math.min(canvas.width, canvas.height) * 0.4;
+            const attempts = 50;
+            
+            for (let i = 0; i < attempts; i++) {
+                const angle = (i / attempts) * Math.PI * 2;
+                const distance = (i / attempts) * searchRadius;
+                const testX = centerX + Math.cos(angle) * distance;
+                const testY = centerY + Math.sin(angle) * distance;
+                
+                if (testX >= player.size / 2 && testX <= canvas.width - player.size / 2 &&
+                    testY >= player.size / 2 && testY <= canvas.height - player.size / 2) {
+                    if (!checkCollision(testX, testY, player.size)) {
+                        return { x: testX, y: testY };
+                    }
+                }
+            }
+            
+            return { x: centerX, y: centerY };
+        }
+
+        function resetGame(resetPreviousScore = false) {
+            if (resetPreviousScore) {
+                game.previousScore = 0;
+                updatePreviousScore();
+            }
+            game.score = 0;
+            game.health = game.maxHealth;
+            monsters.length = 0;
+            missiles.length = 0;
+            arrows.length = 0;
+            monsterSpawnTimer = 0;
+            monsterSpawnInterval = 120;
+            yellowMonsterTimer = 0;
+            missileTimer = Math.floor(Math.random() * (missileSpawnInterval * 0.5));
+            maxMonstersAllowed = 5;
+            difficultyTimer = 0;
+            player.attackAnimation = 0;
+            player.attackCooldown = 0;
+            player.weaponLevel = 1;
+            player.attackDirection = { x: 1, y: 0 };
+            player.invincible = false;
+            player.invincibleTimer = 0;
+            updateWeaponDisplay();
+            initBackground();
+            const safePos = findSafeSpawnPosition();
+            player.x = safePos.x;
+            player.y = safePos.y;
+            updateScore();
+            refreshHealthUI();
+            gameOverOverlay.classList.remove('show');
+            gameOverPending = false;
+        }
+
+        function attack() {
+            if (!gameStarted || player.attackCooldown > 0 || gameOverPending) return;
+            
+            let attackDirX = game.touchDirection.x;
+            let attackDirY = game.touchDirection.y;
+            
+            if (attackDirX === 0 && attackDirY === 0) {
+                if (game.keys['ArrowUp'] || game.keys['w'] || game.keys['W']) attackDirY = -1;
+                else if (game.keys['ArrowDown'] || game.keys['s'] || game.keys['S']) attackDirY = 1;
+                if (game.keys['ArrowLeft'] || game.keys['a'] || game.keys['A']) attackDirX = -1;
+                else if (game.keys['ArrowRight'] || game.keys['d'] || game.keys['D']) attackDirX = 1;
+            }
+            
+            if (attackDirX === 0 && attackDirY === 0 && monsters.length > 0) {
+                const nearestMonster = monsters.reduce((nearest, monster) => {
+                    const dist = Math.hypot(player.x - monster.x, player.y - monster.y);
+                    const nearestDist = Math.hypot(player.x - nearest.x, player.y - nearest.y);
+                    return dist < nearestDist ? monster : nearest;
+                }, monsters[0]);
+                const dx = nearestMonster.x - player.x;
+                const dy = nearestMonster.y - player.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                    attackDirX = dx / dist;
+                    attackDirY = dy / dist;
+                }
+
+            if (attackDirX === 0 && attackDirY === 0) {
+                attackDirX = 1;
+            }
+
+            const dirLength = Math.hypot(attackDirX, attackDirY) || 1;
+            player.attackDirection = { x: attackDirX / dirLength, y: attackDirY / dirLength };
+            
+            const charType = player.characterType;
+            const profiles = weaponProfiles[charType];
+            const profile = profiles[player.weaponLevel - 1];
+            
+            // 궁수는 화살 발사
+            if (profile.projectile) {
+                // 항상 1발, 조금 느리지만 안정적인 공격
+                const arrowSpeed = 6 + player.weaponLevel; // 레벨에 따라 약간 빨라짐
+                arrows.push({
+                    x: player.x,
+                    y: player.y,
+                    vx: player.attackDirection.x * arrowSpeed,
+                    vy: player.attackDirection.y * arrowSpeed,
+                    size: 8,
+                    rotation: Math.atan2(player.attackDirection.y, player.attackDirection.x)
+                });
+                // 연사 속도는 조금 느리게
+                player.attackCooldown = Math.max(14, Math.floor(ATTACK_ANIMATION_MAX * 0.7));
+            } else {
+                player.attackAnimation = ATTACK_ANIMATION_MAX;
+                player.attackCooldown = Math.max(10, Math.floor(ATTACK_ANIMATION_MAX * 0.6));
+            }
+
+            let hit = false;
+            let hitYellowMonster = false;
+
+            if (charType === 'pink' && profile.fire) {
+                // 마법사 파이어는 isMonsterHitByAttack으로 처리
+                for (let i = monsters.length - 1; i >= 0; i--) {
+                    const monster = monsters[i];
+                    if (isMonsterHitByAttack(monster)) {
+                        if (monster.isYellow) {
+                            hitYellowMonster = true;
+                        }
+                        monsters.splice(i, 1);
+                        game.score += 1;
+                        hit = true;
+                    }
+                }
+            } else if (!profile.projectile) {
+                // 전사는 isMonsterHitByAttack으로 처리
+                for (let i = monsters.length - 1; i >= 0; i--) {
+                    const monster = monsters[i];
+                    if (isMonsterHitByAttack(monster)) {
+                        if (monster.isYellow) {
+                            hitYellowMonster = true;
+                        }
+                        monsters.splice(i, 1);
+                        game.score += 1;
+                        hit = true;
+                    }
+                }
+            }
+            
+            if (hit) {
+                updateScore();
+            }
+
+            if (hitYellowMonster) {
+                upgradeWeapon();
+            }
+        }
+
+        function updatePlayer() {
+            if (!gameStarted) return;
+
+            if (player.attackAnimation > 0) {
+                player.attackAnimation--;
+            }
+            
+            if (player.attackCooldown > 0) {
+                player.attackCooldown--;
+            }
+            
+            // 무적 타이머 감소
+            if (player.invincible) {
+                player.invincibleTimer--;
+                if (player.invincibleTimer <= 0) {
+                    player.invincible = false;
+                    player.invincibleTimer = 0;
+                }
+            }
+            
+            let moveX = 0;
+            let moveY = 0;
+            
+            if (game.keys['ArrowUp'] || game.keys['w'] || game.keys['W']) moveY -= player.speed;
+            if (game.keys['ArrowDown'] || game.keys['s'] || game.keys['S']) moveY += player.speed;
+            if (game.keys['ArrowLeft'] || game.keys['a'] || game.keys['A']) moveX -= player.speed;
+            if (game.keys['ArrowRight'] || game.keys['d'] || game.keys['D']) moveX += player.speed;
+
+            if (game.touchDirection.x !== 0 || game.touchDirection.y !== 0) {
+                moveX = game.touchDirection.x * player.speed;
+                moveY = game.touchDirection.y * player.speed;
+            }
+
+            if (moveX !== 0 && moveY !== 0) {
+                moveX *= 0.7071;
+                moveY *= 0.7071;
+            }
+
+            let newX = player.x + moveX;
+            let newY = player.y + moveY;
+            
+            if (moveX !== 0 && moveY !== 0) {
+                if (checkCollision(newX, player.y, player.size) && !checkCollision(player.x, newY, player.size)) {
+                    newX = player.x;
+                } else if (checkCollision(player.x, newY, player.size) && !checkCollision(newX, player.y, player.size)) {
+                    newY = player.y;
+                }
+            }
+            
+            if (!checkCollision(newX, newY, player.size)) {
+                player.x = Math.max(player.size / 2, Math.min(canvas.width - player.size / 2, newX));
+                player.y = Math.max(player.size / 2, Math.min(canvas.height - player.size / 2, newY));
+            } else if (!checkCollision(newX, player.y, player.size)) {
+                player.x = Math.max(player.size / 2, Math.min(canvas.width - player.size / 2, newX));
+            } else if (!checkCollision(player.x, newY, player.size)) {
+                player.y = Math.max(player.size / 2, Math.min(canvas.height - player.size / 2, newY));
+            } else if (moveX !== 0 || moveY !== 0) {
+                const slideX = moveX * 0.5;
+                const slideY = moveY * 0.5;
+                if (!checkCollision(player.x + slideX, player.y, player.size)) {
+                    player.x = Math.max(player.size / 2, Math.min(canvas.width - player.size / 2, player.x + slideX));
+                }
+                if (!checkCollision(player.x, player.y + slideY, player.size)) {
+                    player.y = Math.max(player.size / 2, Math.min(canvas.height - player.size / 2, player.y + slideY));
+                }
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawBackground();
+
+            if (!gameStarted) {
+                drawMonsters();
+                drawMissiles();
+                drawArrows();
+                drawPlayer();
+                if (player.attackAnimation > 0 && player.characterType !== 'violet') {
+                    drawWeaponEffect();
+                }
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            updatePlayer();
+
+            if (!gameOverPending) {
+            monsterSpawnTimer++;
+                difficultyTimer++;
+                yellowMonsterTimer++;
+                missileTimer++;
+
+                if (difficultyTimer >= difficultyIncreaseInterval && maxMonstersAllowed < maxMonstersCap) {
+                    maxMonstersAllowed++;
+                    difficultyTimer = 0;
+                    if (monsterSpawnInterval > 70) {
+                        monsterSpawnInterval -= 5;
+                    }
+                }
+
+            if (monsterSpawnTimer >= monsterSpawnInterval) {
+                spawnMonster();
+                monsterSpawnTimer = 0;
+                if (game.score > 50) {
+                    spawnMonster();
+                }
+            }
+            
+            if (yellowMonsterTimer >= yellowMonsterInterval) {
+                spawnMonster(true);
+                yellowMonsterTimer = 0;
+            }
+            
+            updateMonsters();
+                updateMissiles();
+                updateArrows();
+
+                if (missileTimer >= missileSpawnInterval) {
+                    spawnMissile();
+                    missileTimer = 0;
+                }
+            } else {
+                updateMissiles();
+            }
+
+            drawMonsters();
+            drawMissiles();
+            drawArrows();
+            drawPlayer();
+            if (player.attackAnimation > 0 && player.characterType !== 'violet') {
+                drawWeaponEffect();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (event) => {
+            game.keys[event.key] = true;
+            if (event.key === ' ') {
+                event.preventDefault();
+                attack();
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            game.keys[event.key] = false;
+        });
+
+        let joystickActive = false;
+        let joystickCenter = { x: 0, y: 0 };
+        const joystickRadius = 60;
+
+        function updateJoystick(x, y) {
+            if (!joystickBase) return;
+            const rect = joystickBase.getBoundingClientRect();
+            joystickCenter.x = rect.left + rect.width / 2;
+            joystickCenter.y = rect.top + rect.height / 2;
+            
+            const dx = x - joystickCenter.x;
+            const dy = y - joystickCenter.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > joystickRadius) {
+                const angle = Math.atan2(dy, dx);
+                const limitedX = joystickCenter.x + Math.cos(angle) * joystickRadius;
+                const limitedY = joystickCenter.y + Math.sin(angle) * joystickRadius;
+                joystickStick.style.transform = `translate(calc(-50% + ${limitedX - joystickCenter.x}px), calc(-50% + ${limitedY - joystickCenter.y}px))`;
+                game.touchDirection.x = Math.cos(angle);
+                game.touchDirection.y = Math.sin(angle);
+            } else {
+                joystickStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                if (distance > 10) {
+                    game.touchDirection.x = dx / joystickRadius;
+                    game.touchDirection.y = dy / joystickRadius;
+                } else {
+                    game.touchDirection.x = 0;
+                    game.touchDirection.y = 0;
+                }
+            }
+        }
+
+        function resetJoystick() {
+            if (!joystickStick) return;
+            joystickStick.style.transform = 'translate(-50%, -50%)';
+            game.touchDirection.x = 0;
+            game.touchDirection.y = 0;
+        }
+
+        if (joystickBase) {
+            joystickBase.addEventListener('touchstart', (event) => {
+                event.preventDefault();
+            joystickActive = true;
+                updateJoystick(event.touches[0].clientX, event.touches[0].clientY);
+        });
+
+            joystickBase.addEventListener('touchmove', (event) => {
+                event.preventDefault();
+            if (joystickActive) {
+                    updateJoystick(event.touches[0].clientX, event.touches[0].clientY);
+            }
+        });
+
+            joystickBase.addEventListener('touchend', (event) => {
+                event.preventDefault();
+            joystickActive = false;
+            resetJoystick();
+        });
+
+            joystickBase.addEventListener('touchcancel', (event) => {
+                event.preventDefault();
+            joystickActive = false;
+            resetJoystick();
+        });
+        }
+
+        if (attackButton) {
+            attackButton.addEventListener('touchstart', (event) => {
+                event.preventDefault();
+            attack();
+        });
+
+            attackButton.addEventListener('click', (event) => {
+                event.preventDefault();
+            attack();
+        });
+        }
+
+        restartButton.addEventListener('click', () => {
+            resetGame();
+            resetJoystick();
+            gameOverOverlay.classList.remove('show');
+            characterSelect.setAttribute('aria-hidden', 'true');
+            gameOverPending = false;
+            gameStarted = true;
+        });
+
+        changeCharacterButton.addEventListener('click', () => {
+            resetGame();
+            resetJoystick();
+            gameOverOverlay.classList.remove('show');
+            gameOverPending = false;
+            gameStarted = false;
+            characterOptions.forEach(opt => opt.classList.remove('selected'));
+            characterSelect.classList.add('show');
+            characterSelect.setAttribute('aria-hidden', 'false');
+            setCharacterOptionsTabIndex('0');
+        });
+
+        resetGame(true);
+        gameLoop();
+
+        // 캔버스 클릭해도 부모 div를 클릭한 것처럼 동작하게 위임
+        document.querySelectorAll('.character-sample').forEach(canvas => {
+            canvas.addEventListener('click', (e) => {
+                const parent = canvas.closest('.character-option');
+                if (parent) parent.click(); // 부모 div의 클릭 이벤트 강제 실행
+            });
+            canvas.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    const parent = canvas.closest('.character-option');
+                    if (parent) parent.click();
+                }
+            });
+        });
+
+        // 1. CSS pointer-events
+        //const sampleStyle = document.createElement('style');
+        //sampleStyle.innerHTML = `.character-sample {  }`;
+        //document.head.appendChild(sampleStyle);
+
+        // 2. .character-option 접근성 속성 추가
+        characterOptions.forEach(option => {
+            option.setAttribute('role', 'button');
+            option.setAttribute('aria-pressed', 'false');
+            option.setAttribute('tabindex', '0');
+        });
+        // (이벤트 등록 로직은 기존과 동일)
+
+        // 3. canvas 위임 코드는 완전히 삭제
+    </script>
+</body>
+</html>
